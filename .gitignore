@@ -1,0 +1,36 @@
+# Jupyter / Colab Checkpoints
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+*.ipynb_checkpoints
+
+# OS / Google Drive specific files
+desktop.ini
+Thumbs.db
+.DS_Store
+*.tmp
+*.gdoc
+*.gsheet
+*.gslides
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Secrets & Environment Variables
+.env
+.env.*
+*.secret
+*.pem
+*.key
+credentials.json
+
+# IDEs
+.vscode/
+.idea/
