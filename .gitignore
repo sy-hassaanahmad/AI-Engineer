@@ -12,6 +12,9 @@ Thumbs.db
 *.gsheet
 *.gslides
 
+# Local Automation logs
+sync.log
+
 # Python
 __pycache__/
 *.py[cod]

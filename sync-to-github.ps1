@@ -3,33 +3,47 @@ param (
     [string]$CommitMessage = ""
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $RepoDir = "F:\My Drive\Chronos  - Skill Leveling\AI Engineer"
+$LogFile = Join-Path $RepoDir "sync.log"
 
 Set-Location -LiteralPath $RepoDir
 
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "  AI Engineer -> GitHub Sync Engine" -ForegroundColor Cyan
-Write-Host "==========================================" -ForegroundColor Cyan
+function Log-Message([string]$msg, [string]$color = "White") {
+    $timeStr = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    $logEntry = "[$timeStr] $msg"
+    Add-Content -Path $LogFile -Value $logEntry -ErrorAction SilentlyContinue
+    Write-Host $msg -ForegroundColor $color
+}
+
+# Keep sync.log reasonably sized (max 200KB)
+if (Test-Path $LogFile) {
+    $fileInfo = Get-Item $LogFile
+    if ($fileInfo.Length -gt 200KB) {
+        Get-Content $LogFile -Tail 200 | Set-Content ($LogFile + ".tmp")
+        Move-Item ($LogFile + ".tmp") $LogFile -Force
+    }
+}
+
+Log-Message "=== AI Engineer -> GitHub Sync Triggered ===" "Cyan"
 
 # Check git status
 $status = git status --porcelain
 if (-not $status) {
-    Write-Host "[OK] No changes detected. Repository is already clean and up to date." -ForegroundColor Green
+    Log-Message "No changes detected. Repository is already clean." "Green"
     exit 0
 }
 
-Write-Host "[i] Changes detected:" -ForegroundColor Yellow
-$status | ForEach-Object { Write-Host "   $_" -ForegroundColor Gray }
+Log-Message "Changes detected:" "Yellow"
+$status | ForEach-Object { Log-Message "   $_" "Gray" }
 
 # Determine commit message if not provided
 if (-not $CommitMessage) {
     $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm")
-    # Find modified or added files
     $changedFiles = git status --short | ForEach-Object {
         $parts = $_.Trim().Split(" ", 2)
         if ($parts.Length -gt 1) { [System.IO.Path]::GetFileNameWithoutExtension($parts[1].Trim()) }
-    } | Select-Object -Unique -First 3
+    } | Where-Object { $_ -ne "sync" -and $_ -ne "sync-to-github" } | Select-Object -Unique -First 3
     
     if ($changedFiles) {
         $fileSummary = ($changedFiles -join ", ")
@@ -39,18 +53,24 @@ if (-not $CommitMessage) {
     }
 }
 
-Write-Host "[i] Staging files..." -ForegroundColor Cyan
+Log-Message "Staging changes..." "Cyan"
 git add -A
 
-Write-Host "[i] Committing with message: '$CommitMessage'..." -ForegroundColor Cyan
-git commit -m $CommitMessage
+Log-Message "Committing with message: '$CommitMessage'..." "Cyan"
+$commitOut = git commit -m $CommitMessage 2>&1
+Log-Message "$commitOut" "Gray"
 
-Write-Host "[i] Pushing to GitHub (origin main)..." -ForegroundColor Cyan
-try {
-    git push origin main
-    Write-Host "[SUCCESS] Successfully pushed all updates to GitHub!" -ForegroundColor Green
-    Write-Host "[i] Your GitHub activity graph will reflect these commits." -ForegroundColor Green
-} catch {
-    Write-Host "[ERROR] Push failed: $_" -ForegroundColor Red
+# Pull latest if any remote changes exist
+Log-Message "Syncing with remote..." "Cyan"
+$pullOut = git pull --rebase origin main 2>&1
+Log-Message "$pullOut" "Gray"
+
+Log-Message "Pushing to GitHub (origin main)..." "Cyan"
+$pushOut = git push origin main 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Log-Message "[SUCCESS] Successfully pushed all updates to GitHub!" "Green"
+    Log-Message "GitHub activity graph updated for @sy-hassaanahmad." "Green"
+} else {
+    Log-Message "[ERROR] Push failed: $pushOut" "Red"
     exit 1
 }
